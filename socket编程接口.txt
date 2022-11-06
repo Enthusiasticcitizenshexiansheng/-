@@ -1,0 +1,276 @@
+1、socket 套接字  独立于具体协议  位于 应用 和 传输层 之间
+套接字：
+（1）流式(SOCK_STREAM)   面向字节流 自下而上   传输层 回 TCP   
+
+  (2) 数据报套接字(SOCK_DGRAM) 传输层为UDP的应用
+       无连接的服务、快 实时
+
+ （3）原始套接字(SOCK_RAM)
+      跳过传输层
+
+
+2、基本网络应用模型（TCP）            服务器(Server)/客户端(Client)
+
+
+TCP套接字基本流程：
+     网络应用：
+      TCP   server
+      TCP   Client
+
+     任何网络应用：
+     ***IP(对象主机)+传输层协议（如何传输）+端口号（具体应用）
+      
+      大致过程：
+   建立连接：三次握手
+ 
+   发送/接受网络数据(操作)
+    write/send/sendto
+    read/recv/recvfrom
+  
+   关闭连接：
+    “四次挥手”  
+ A——》  FIN =1   SYN=X         ——B
+ B——》  ACK=X+1             ——A
+  B——》  FIN=1  SYN=Y     ——A
+A——》  SYN=Y+1                  ——B
+
+
+      编程流程：
+       TCPServer
+        1、 socket:创建套接字
+
+
+         2、 bind：绑定 套接字 和 网络地址
+                  并且告诉服务端
+        不绑定也有地址，内核给你绑定地址
+
+         3、 listen  监听模式
+ 
+        4、连接请求
+        accept：接收客户端连接  在监听套接字上
+            
+       5、读写数据      
+          write/send/sendto
+          read/recv/recvfrom
+
+        6、关闭close/shoutdown  四次挥手
+     
+       
+——————————————————————
+ DNS 后缀 . . . . . . . :
+   本地链接 IPv6 地址. . . . . . . . : fe80::c1c2:c137:cb2b:5e1f%11
+   IPv4 地址 . . . . . . . . . . . . : 10.142.136.58
+   子网掩码  . . . . . . . . . . . . : 255.255.240.0
+   默认网关. . . . . . . . . . . . . : 10.142.128.1
+    TCP   client
+1、socket:创建套接字
+
+2、bind 可无
+
+3、connet    主动和 server连接
+
+4、读写程序
+
+5、关闭close/shoutdown  四次挥手
+
+
+----------------------------------------------------------------------------------------
+写客户端应用，和网络助手通信
+3、socket 的API函数
+   1.socket创建套接字
+
+  int socket(int domain,int type,int protocol);
+                           族             类型 系列        格式
+
+协议族  AF_INET ——对应 IPV4协议
+            AF_UNIX        本地进程间通信
+
+
+type:
+  SOCK_STREAM     流式
+  
+  SOCK_DGRAM     数据报
+
+  SOCK_RAM          原始套接字
+
+
+protocol:0 私有应用层协议
+
+返回值：失败返-1 errno被设置
+
+
+
+
+
+
+2、connect    用与连服务器
+    int   connect(int sockfd,const struct sockaddr *addr,socklen_t addrlen);
+                         本地套接字描述          服务器地址（ip+端口）     第二个参数长度
+        将前 连到 后*addr
+
+返回：成0 败-1
+
+
+3、网络地址结构体
+     socket      IPV4或ipv6 或 蓝牙
+   设置通用地址结构体 struct sockaddr
+  struct sockaddr{
+sa_family_t   sa_family ;      协议族
+char  sa_data[14];                 具体地址
+}
+
+
+
+//描述一个ipv4
+  struct sockaddr_in{
+sa_family_t   sin_family ;      协议族
+in_port_t     sin_port;          端口号
+struct in_addr  sin_addr;    因特网地址 32位ip
+//会填到struct sockaddr
+
+//使得与 struct sockaddr大小同
+unsigned char sin_zero[sizeof(struct sockaddr)-___SOCKADDR__COMMON_SIZE-
+sizeof(in_port_t)-sizeof(struct in_addr)];    //8
+};
+
+//少一丢丢
+
+
+问题1：ip = 点分式        结构体为struct in_addr
+有地址转换函数       
+int inet_aton(const char *cp,struct in_addr *inp);
+      格式转换               ip字符串           内存空间，保存转换后ip地址
+返回值： 成0，败-1
+
+例子：
+//定义ipv4结构体
+  struct sockaddr_in sa;
+  memset(&sa,0,sizeof(sa));
+  sa.sin_family = AF_INET;                                  //ipv4
+int inet_aton("10.142.136.58",&(sin_addr));       //转换后存入sa的成员中
+//sa.sin_addr.s_addr =inet_addr("10.142.136.58");
+
+//转换ip  把结果直接返回
+in_addr_t inet_addr(const char *cp);
+
+
+//inet_network  与  inet_addr 功能同
+in_addr_t inet_network(const char  *cp);
+
+  把一个网地转出 ipv4的点分式  返回字符串 首地址
+char *inet_ntoa(struct  in_addr  in);
+
+
+问题2.
+PC 上面是小端模式  在指定端口号的时候 要用 大端 模式（网络字节序）
+      要转换
+
+    h:host 主机
+    n:networ 网络字节序
+    l: long-->32位
+    s:short-->16bit
+ 
+    uint32_t    htonl(uint32_t hostlong)
+    主机字节序   转为   网络字节序
+   
+     uint16_t    htonl(uint32_t hostshort)
+     uint32_t    htonl(uint32_t netlong)
+     uint16_t    htonl(uint32_t netshort)
+
+
+4、往套接字上 发数据
+               write/send/sendto
+                                   UDP
+
+
+      ssize_t write(int   fd, const  void *buf,size_t ,size_t count);
+                                                       buf指向的count个 发送到 fd   后向前
+
+ 
+     ssize_t send(int   sockfd, const  void *buf,    size_t   len,int  flags);
+                                    向哪里发           指针            多少数据    为0
+
+
+           成返字节序 败-1
+ 
+      sendto 和send类似
+     ssize_t send(int   sockfd, const  void *buf,    size_t   len,int  flags,
+                   const struct sockaddr *dest_addr ,socklen_t  addrlen);
+                                             接收方地址                               大小
+
+5、收数据
+          read/recv/recvfrom
+
+
+   ssize_t recv(int   sockfd, const  void *buf,    size_t   len,int  flags);
+           成返读取到的字节序 败-1
+
+      ssize_t recvfrom(int   sockfd, const  void *buf,    size_t   len,int  flags,
+                   struct sockaddr   *src_addr ,socklen_t   *addrlen);
+                                              发送方地址  tcp可不指定    地址长度
+
+
+6、关闭套接字
+  close /shutdown
+      int shutdown(int socket ,int how)
+                                              SHUT_RD   关闭读
+                                              SHUT_WR
+                                              SHUT_RDWR     
+      成0 败-1 
+
+————————————————————————
+p4:
+TCP的服务器
+
+1.创建一个套接字
+       socket
+
+2.bind  绑定
+int  bind(int  sockfd,const struct sockaddr *addr,socklen_t addrlen);
+                        套接字描述符                  网络地址指针              长度
+         成0 败-1
+
+3.listen 开启对套接字监听 
+  int listen(int sockfd,int backlog);
+                    开启哪个的监听  数量
+
+   返回值 
+                   成0败-1
+
+
+4.accept :接收监听队列上的请求
+        int accept(int sockfd,struct sockaddr *addr,socklen_t  *addrlen);  
+                              哪个套接字              网络地址结构体          第二参数指向可用空间长度
+          
+         成返回特定的 连接套接字  
+            败-1
+
+
+
+5. 接收和发送数据
+
+
+
+6.close
+   关连接套接字 和 accept 客户断开
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
